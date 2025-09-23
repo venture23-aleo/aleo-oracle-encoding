@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"math/big"
 	"sort"
 	"strconv"
@@ -19,6 +18,7 @@ var (
 	ErrEncodingMetaHeaderInvalidSize              = errors.New("encoding general meta header requires a 2-block buffer")
 	ErrIntValueParseFailure                       = errors.New("extracted value expected to be int but failed to parse as int")
 	ErrFloatValueEncodingPrecisionTooBig          = errors.New("encoding precision is too big")
+	ErrExceedsU64Range							  = errors.New("value exceeds u64 range")
 	ErrFloatNegativeUnsupported                   = errors.New("negative numbers are not supported for floats")
 	ErrFloatValueDecimallessScientificUnsupported = errors.New("decimalless scientific notation is not supported for floats")
 	ErrFloatValueScientificUnsupported            = errors.New("scientific notation is not supported for floats")
@@ -233,15 +233,12 @@ func DecodeMetaHeader(header []byte) (parsedHeader *MetaHeader, err error) {
 
 // parses the data string as a decimal 64-bit number and converts it to 8 bytes in little-endian order
 func prepareDataAsInteger(data string) ([]byte, error) {
-	var attestedNumber uint64
-	var err error
-	attestedNumber, err = strconv.ParseUint(data, 10, 64)
-	if err != nil {
-		log.Println("PrepareProofData: prepareDataAsInteger:", err)
+	attestedNumber, ok := new(big.Int).SetString(data, 10)
+	if !ok {
 		return nil, ErrIntValueParseFailure
 	}
 
-	return NumberToBytes(attestedNumber), nil
+	return NumberToBytes(attestedNumber.Uint64()), nil
 }
 
 // parses the data string as a 64-bit float, multiplies it by 10^precision, and returns it as 8 bytes in little-endian order.
@@ -250,97 +247,25 @@ func prepareDataAsFloat(str string, precision uint) ([]byte, error) {
 	if precision > ENCODING_OPTION_FLOAT_MAX_PRECISION {
 		return nil, ErrFloatValueEncodingPrecisionTooBig
 	}
-	data := strings.ToLower(str)
 
-	dotPos := strings.Index(data, ".")
-	if dotPos == len(data)-1 {
+	valueRat, ok := new(big.Rat).SetString(str)
+	if !ok {
 		return nil, ErrFloatValueParseFailure
 	}
-	// trim all redundant zeroes if dot is present in number. this will not hurt us in decoding because we also
-	// have the length of the original string encoded in the meta header
-	if dotPos != -1 {
-		data = strings.TrimRight(data, "0")
+
+	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(precision)), nil)
+	valueRat.Mul(valueRat, new(big.Rat).SetInt(scale))
+	finalValue := new(big.Int).Quo(valueRat.Num(), valueRat.Denom())
+
+	if finalValue.BitLen() > 64 {
+		return nil, ErrExceedsU64Range
 	}
 
-	// if the dot is the last character, then all characters after the dot
-	// were redundant zeroes. we can remove the dot
-	if dotPos == len(data)-1 {
-		data = strings.TrimRight(data, ".")
-	} else if dotPos != -1 {
-		fraction := data[dotPos+1:]
-		// slice exponent to set precision
-		if len(fraction) > int(precision) {
-			return nil, ErrFloatValueNotEnoughPrecision
-		}
-	}
-
-	// check for unsupported formats
-	decimallessNotation := strings.Index(data, "p-")
-	if decimallessNotation != -1 {
-		return nil, ErrFloatValueDecimallessScientificUnsupported
-	}
-
-	exponentNotation := strings.Index(data, "e+")
-	if exponentNotation != -1 {
-		return nil, ErrFloatValueScientificUnsupported
-	}
-	exponentNotation = strings.Index(data, "e-")
-	if exponentNotation != -1 {
-		return nil, ErrFloatValueScientificUnsupported
-	}
-
-	hexExponentNotation := strings.Index(data, "p+")
-	if hexExponentNotation != -1 {
-		return nil, ErrFloatValueScientificUnsupported
-	}
-
-	negative := strings.Index(data, "-")
-	if negative != -1 {
+	if finalValue.Sign() < 0 {
 		return nil, ErrFloatNegativeUnsupported
 	}
 
-	bigNumber, _, err := big.ParseFloat(data, 10, 64, big.AwayFromZero)
-	if err != nil {
-		log.Println("PrepareProofData: prepareDataAsFloat:", err)
-		return nil, ErrFloatValueParseFailure
-	}
-	bigNumber.SetMode(bigNumber.Mode())
-
-	// the numbers are encoded as bytes of unsigned 64-bit integers so negative numbers
-	// are not supported.
-	// We do an explicit check for floats since there's no "unsigned float" but when parsing an integer
-	// in prepareDataAsInteger we can parse a string as uint, which will return an error for negative numbers.
-	if bigNumber.Sign() == -1 {
-		return nil, ErrFloatNegativeUnsupported
-	}
-
-	bigMagnitude := new(big.Float).SetUint64(pow(10, uint64(precision)))
-	bigAdjustedNumber := bigNumber.Mul(bigNumber, bigMagnitude)
-
-	adjustedNumber, _ := bigAdjustedNumber.Float64()
-	anotherAdjustedNumber, _ := bigAdjustedNumber.Uint64()
-
-	// test recovery of all meaningful digits that will happen during decoding
-	adjustedPrecision := int(precision)
-	testStr := bigAdjustedNumber.Quo(bigAdjustedNumber, bigMagnitude).Text('f', int(precision))
-
-	lenDiff := len(testStr) - len(data)
-
-	if adjustedPrecision != 0 && len(data) != 0 && lenDiff != 0 {
-		adjustedPrecision -= lenDiff
-	}
-
-	if data != bigAdjustedNumber.Text('f', adjustedPrecision) {
-		return nil, ErrFloatValueInfoLoss
-	}
-
-	// we need to make sure that the provided precision is big enough
-	// to cover all the digits after the comma in the extracted value
-	if adjustedNumber != math.Floor(adjustedNumber) {
-		return nil, ErrFloatValueNotEnoughPrecision
-	}
-
-	return NumberToBytes(anotherAdjustedNumber), nil
+	return NumberToBytes(finalValue.Uint64()), nil
 }
 
 // writes data to the buffer, padding it to TARGET_ALIGNMENT bytes if needed.
@@ -418,23 +343,9 @@ func DecodeAttestationData(buf []byte, stringLen int, options *EncodingOptions) 
 
 	case ENCODING_OPTION_FLOAT:
 		number := BytesToNumber(buf[:TARGET_ALIGNMENT/2])
-		float := new(big.Float).SetUint64(number).SetPrec(64).SetMode(big.ToNearestAway)
-		magnitude := new(big.Float).SetUint64(pow(10, uint64(options.Precision)))
-
-		float = float.Quo(float, magnitude)
-
-		// since we know the length of the original string, we can figure out how many
-		// redundant zeroes we are supposed to have
-		adjustedPrecision := int(options.Precision)
-		testStr := float.Text('f', int(options.Precision))
-
-		lenDiff := len(testStr) - stringLen
-
-		if adjustedPrecision != 0 && stringLen != 0 && lenDiff != 0 {
-			adjustedPrecision -= lenDiff
-		}
-
-		return float.Text('f', adjustedPrecision), nil
+		scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(options.Precision)), nil)
+		finalValue := new(big.Float).Quo(new(big.Float).SetUint64(number), new(big.Float).SetInt(scale))
+		return finalValue.Text('f', int(options.Precision)), nil
 
 	default:
 		return "", ErrValueEncodingUnknown
