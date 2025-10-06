@@ -373,6 +373,10 @@ func EncodeAttestationData(data string, options *EncodingOptions) ([]byte, error
 	var attestationDataBuffer []byte
 	var err error
 
+	if options == nil {
+		return nil, ErrDecodingAttestationImpossible
+	}
+
 	switch options.Value {
 	case ENCODING_OPTION_STRING:
 		if data == "" {
@@ -478,6 +482,10 @@ func DecodeResponseFormat(buf []byte) (string, error) {
 func EncodeEncodingOptions(options *EncodingOptions) ([]byte, error) {
 	var valueTypeByte byte
 	var precisionByte byte
+
+	if options == nil {
+		return nil, ErrDecodingAttestationImpossible
+	}
 
 	switch options.Value {
 	case ENCODING_OPTION_STRING:
