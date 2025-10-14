@@ -795,7 +795,7 @@ func DecodeOptionalFields(buf []byte) (htmlResultType, requestContentType, reque
 		requestBodyLen := BytesToNumber(requestBodyHeader[:TARGET_ALIGNMENT/2])
 		// check if encoded length makes sense. This is the last header, so no need to add anything like we did for content type.
 		if blockOffset+int(requestBodyLen) > len(buf) {
-			err = ErrDecodingOptionalsInvalidContentTypeLength
+			err = ErrDecodingOptionalsInvalidBodyLength
 			return
 		}
 
