@@ -238,6 +238,10 @@ func prepareDataAsInteger(data string) ([]byte, error) {
 		return nil, ErrIntValueParseFailure
 	}
 
+	if attestedNumber.BitLen() > 64 {
+		return nil, ErrExceedsU64Range
+	}
+
 	return NumberToBytes(attestedNumber.Uint64()), nil
 }
 
