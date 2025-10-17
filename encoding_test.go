@@ -95,7 +95,8 @@ func Test_getPadding(t *testing.T) {
 				alignment: 16,
 			},
 			want: []byte{0, 0},
-		}, {
+		},
+		{
 			name: "no pad",
 			args: args{
 				arr:       []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -123,7 +124,8 @@ func Test_NumberToBytes(t *testing.T) {
 			name:   "number 1",
 			number: 200,
 			want:   []byte{200, 0, 0, 0, 0, 0, 0, 0},
-		}, {
+		},
+		{
 			name:   "number 2",
 			number: 64250,
 			want:   []byte{0xfa, 0xfa, 0, 0, 0, 0, 0, 0},
@@ -153,7 +155,8 @@ func Test_BytesToNumber(t *testing.T) {
 			name: "number 1",
 			buf:  []byte{200, 0, 0, 0, 0, 0, 0, 0},
 			want: 200,
-		}, {
+		},
+		{
 			name: "number 2",
 			buf:  []byte{0xfa, 0xfa, 0, 0, 0, 0, 0, 0},
 			want: 64250,
@@ -419,7 +422,8 @@ func Test_prepareDataAsInteger(t *testing.T) {
 			data:    "200",
 			want:    []byte{200, 0, 0, 0, 0, 0, 0, 0},
 			wantErr: false,
-		}, {
+		},
+		{
 			name:    "valid short 2",
 			data:    "64250",
 			want:    []byte{0xfa, 0xfa, 0, 0, 0, 0, 0, 0},
@@ -733,7 +737,8 @@ func Test_WriteWithPadding(t *testing.T) {
 			data:    []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 			want:    []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
 			wantErr: false,
-		}, {
+		},
+		{
 			name:    "no pad",
 			data:    []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 			want:    []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -742,7 +747,10 @@ func Test_WriteWithPadding(t *testing.T) {
 	}
 	for _, tt := range tests {
 		var b bytes.Buffer
-		recorder := positionRecorder.NewPositionRecorder(&b, 16)
+		recorder, err := positionRecorder.NewPositionRecorder(&b, 16)
+		if err != nil {
+			t.Fatalf("failed to create position recorder: %v", err)
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			if _, err := WriteWithPadding(recorder, tt.data); (err != nil) != tt.wantErr {
