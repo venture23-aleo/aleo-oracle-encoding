@@ -8,17 +8,10 @@ import (
 func TestPositionRecorder(t *testing.T) {
 	t.Run("new recorder", func(t *testing.T) {
 		var b bytes.Buffer
-		rec := NewPositionRecorder(&b, 16)
-		if rec == nil {
+		_, err := NewPositionRecorder(&b, 16)
+		if err != nil {
 			t.Error("NewPositionRecorder() = want not nil")
 		}
-
-		defer func() {
-			if r := recover(); r == nil {
-				// If there's no panic, the test should fail
-				t.Error(t.Name(), "expected to panic")
-			}
-		}()
 
 		NewPositionRecorder(&b, 17)
 	})
@@ -30,7 +23,10 @@ func TestPositionRecorder(t *testing.T) {
 
 	t.Run("write", func(t *testing.T) {
 		var b bytes.Buffer
-		rec := NewPositionRecorder(&b, 16)
+		rec, err := NewPositionRecorder(&b, 16)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		t.Run("misaligned", func(t *testing.T) {
 			_, err := rec.Write(misalignedBlock)
@@ -77,9 +73,12 @@ func TestPositionRecorder(t *testing.T) {
 	t.Run("records", func(t *testing.T) {
 		t.Run("correct count", func(t *testing.T) {
 			var b bytes.Buffer
-			rec := NewPositionRecorder(&b, 16)
+			rec, err := NewPositionRecorder(&b, 16)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-			_, err := rec.Write(oneBlock)
+			_, err = rec.Write(oneBlock)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -116,9 +115,12 @@ func TestPositionRecorder(t *testing.T) {
 
 		t.Run("info is discarded on write", func(t *testing.T) {
 			var b bytes.Buffer
-			rec := NewPositionRecorder(&b, 16)
+			rec, err := NewPositionRecorder(&b, 16)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-			_, err := rec.Write(oneBlock)
+			_, err = rec.Write(oneBlock)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -5,9 +5,7 @@ import (
 	"io"
 )
 
-var (
-	ErrDataAlignment = errors.New("data is not aligned to block size")
-)
+var ErrDataAlignment = errors.New("data is not aligned to block size")
 
 type PositionInfo struct {
 	// Index of the block where the write operation started
@@ -34,16 +32,16 @@ type PositionRecordingProxy struct {
 }
 
 // NewPositionRecorder creates a new position recorder. Block size must be an even number.
-func NewPositionRecorder(writer io.Writer, blockSize int) *PositionRecordingProxy {
+func NewPositionRecorder(writer io.Writer, blockSize int) (*PositionRecordingProxy, error) {
 	if blockSize%2 != 0 {
-		panic("block size must be an even number")
+		return nil, ErrDataAlignment
 	}
 
 	return &PositionRecordingProxy{
 		writer:    writer,
 		blockSize: blockSize,
 		lastWrite: nil,
-	}
+	}, nil
 }
 
 // Writes p to the underlying writer and records successful writes. Returned values are io.Writer.Write return values.
