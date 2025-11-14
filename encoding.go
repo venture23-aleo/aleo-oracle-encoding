@@ -92,6 +92,7 @@ type EncodingOptions struct {
 type ProofPositionalInfo struct {
 	Data            positionRecorder.PositionInfo `json:"data"`
 	Timestamp       positionRecorder.PositionInfo `json:"timestamp"`
+	AleoBlockHeight positionRecorder.PositionInfo `json:"aleoBlockHeight"`
 	StatusCode      positionRecorder.PositionInfo `json:"statusCode"`
 	Method          positionRecorder.PositionInfo `json:"method"`
 	ResponseFormat  positionRecorder.PositionInfo `json:"responseFormat"`
@@ -171,29 +172,33 @@ func CreateMetaHeader(header []byte, attestationDataLen, methodLen, urlLen, sele
 	// write timestamp length
 	binary.LittleEndian.PutUint16(header[2:4], 8) // timestamp is encoded as uint64 so it's always 8 bytes
 
+
+	// write aleo block height length
+	binary.LittleEndian.PutUint16(header[4:6], 8) // aleo block height is encoded as uint64 so it's always 8 bytes
+
 	// write status code length
-	binary.LittleEndian.PutUint16(header[4:6], 8) // status code is encoded as uint64 so it's always 8 bytes
+	binary.LittleEndian.PutUint16(header[6:8], 8) // status code is encoded as uint64 so it's always 8 bytes
 
 	// write method length
-	binary.LittleEndian.PutUint16(header[6:8], methodLen)
+	binary.LittleEndian.PutUint16(header[8:10], methodLen)
 
 	// write response format length
-	binary.LittleEndian.PutUint16(header[8:10], 1) // response format is always encoded as 1 byte
+	binary.LittleEndian.PutUint16(header[10:12], 1) // response format is always encoded as 1 byte
 
 	// write URL length
-	binary.LittleEndian.PutUint16(header[10:12], urlLen)
+	binary.LittleEndian.PutUint16(header[12:14], urlLen)
 
 	// write selector length
-	binary.LittleEndian.PutUint16(header[12:14], selectorLen)
+	binary.LittleEndian.PutUint16(header[14:16], selectorLen)
 
 	// write encoding options length
-	binary.LittleEndian.PutUint16(header[14:16], 16) // encoding options are encoded as 2 uint64 numbers so it's always 16 bytes
+	binary.LittleEndian.PutUint16(header[16:18], 16) // encoding options are encoded as 2 uint64 numbers so it's always 16 bytes
 
 	// write headers length
-	binary.LittleEndian.PutUint16(header[16:18], headersLen)
+	binary.LittleEndian.PutUint16(header[18:20], headersLen)
 
 	// write optional fields length
-	binary.LittleEndian.PutUint16(header[18:20], optionalFieldsLen)
+	binary.LittleEndian.PutUint16(header[20:22], optionalFieldsLen)
 
 	return nil
 }
@@ -201,6 +206,7 @@ func CreateMetaHeader(header []byte, attestationDataLen, methodLen, urlLen, sele
 type MetaHeader struct {
 	AttestationDataLen int
 	TimestampLen       int
+	AleoBlockHeightLen int
 	StatusCodeLen      int
 	MethodLen          int
 	ResponseFormatLen  int
@@ -220,17 +226,17 @@ func DecodeMetaHeader(header []byte) (parsedHeader *MetaHeader, err error) {
 	return &MetaHeader{
 		AttestationDataLen: int(binary.LittleEndian.Uint16(header[0:2])),
 		TimestampLen:       int(binary.LittleEndian.Uint16(header[2:4])),
-		StatusCodeLen:      int(binary.LittleEndian.Uint16(header[4:6])),
-		MethodLen:          int(binary.LittleEndian.Uint16(header[6:8])),
-		ResponseFormatLen:  int(binary.LittleEndian.Uint16(header[8:10])),
-		UrlLen:             int(binary.LittleEndian.Uint16(header[10:12])),
-		SelectorLen:        int(binary.LittleEndian.Uint16(header[12:14])),
-		EncodingOptionsLen: int(binary.LittleEndian.Uint16(header[14:16])),
-		HeadersLen:         int(binary.LittleEndian.Uint16(header[16:18])),
-		OptionalFieldsLen:  int(binary.LittleEndian.Uint16(header[18:20])),
+		AleoBlockHeightLen: int(binary.LittleEndian.Uint16(header[4:6])),
+		StatusCodeLen:      int(binary.LittleEndian.Uint16(header[6:8])),
+		MethodLen:          int(binary.LittleEndian.Uint16(header[8:10])),
+		ResponseFormatLen:  int(binary.LittleEndian.Uint16(header[10:12])),
+		UrlLen:             int(binary.LittleEndian.Uint16(header[12:14])),
+		SelectorLen:        int(binary.LittleEndian.Uint16(header[14:16])),
+		EncodingOptionsLen: int(binary.LittleEndian.Uint16(header[16:18])),
+		HeadersLen:         int(binary.LittleEndian.Uint16(header[18:20])),
+		OptionalFieldsLen:  int(binary.LittleEndian.Uint16(header[20:22])),
 	}, nil
 }
-
 // parses the data string as a decimal 64-bit number and converts it to 8 bytes in little-endian order
 func prepareDataAsInteger(data string) ([]byte, error) {
 	attestedNumber, ok := new(big.Int).SetString(data, 10)
